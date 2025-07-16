@@ -9,32 +9,35 @@ if uploaded_file is not None:
     try:
         df = pd.read_csv(uploaded_file, encoding='euc-kr')
 
+        # 열 중복 제거
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # 열 목록 확인 (디버깅용)
+        st.write("📌 열 이름 목록:")
+        st.write(df.columns.tolist())
+
         st.subheader("📄 원본 데이터")
         st.dataframe(df)
 
-        # 연령별 인구 열 추출
-        age_columns = [col for col in df.columns if col.startswith("2025년05월_계_")]
-        region_column = df.columns[0]
+        # 열 이름 가공
+        age_columns = [col for col in df.columns if col.startswith("2025년05월_계_") and "총인구수" not in col]
+        region_column = df.columns[0]  # 보통 첫 번째 열은 '행정구역(시군구)별'
         total_pop_column = "2025년05월_계_총인구수"
 
-        # 중복 방지를 위해 총인구수 컬럼이 있다면 제거
-        if "총인구수" in df.columns:
-            df = df.drop(columns=["총인구수"])
+        # 총인구수 열 이름 명확히 지정
+        df = df.rename(columns={total_pop_column: "총인구수"})
 
-        # '총인구수' 열 생성
-        df["총인구수"] = df[total_pop_column]
-
-        # 연령 숫자만 남기기
+        # 연령만 남기기
         new_age_columns = [col.replace("2025년05월_계_", "") for col in age_columns]
 
         # 필요한 열만 추출
-        age_df = df[[region_column, total_pop_column] + age_columns].copy()
+        age_df = df[[region_column, "총인구수"] + age_columns].copy()
         age_df.columns = [region_column, "총인구수"] + new_age_columns
 
-        # 상위 5개 행정구역
+        # 상위 5개 지역
         top5 = age_df.sort_values("총인구수", ascending=False).head(5)
 
-        # 선 그래프용 데이터 재구성
+        # 그래프용 데이터 재구성
         graph_df = top5.set_index(region_column).drop(columns="총인구수").T
         graph_df.index.name = "연령"
         graph_df = graph_df.astype(int)
@@ -48,6 +51,5 @@ if uploaded_file is not None:
 
     except Exception as e:
         st.error(f"❌ 데이터를 불러오는 중 오류가 발생했습니다: {e}")
-
 else:
     st.info("📎 왼쪽 사이드바에서 CSV 파일을 업로드해주세요.")
